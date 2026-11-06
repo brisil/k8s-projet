@@ -1,0 +1,16 @@
+frontend:
+  replicas: 3
+
+api:
+  resources:
+    requests: { cpu: 250m, memory: 256Mi }
+    limits: { memory: 512Mi }
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 10
+
+postgres:
+  storage: 5Gi
+
+ingress:
+  host: inventaire.prod.local

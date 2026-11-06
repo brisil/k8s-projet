@@ -1,0 +1,72 @@
+nameOverride: ""
+fullnameOverride: ""
+
+frontend:
+  replicas: 2
+  image:
+    repository: nginxinc/nginx-unprivileged
+    tag: "1.27-alpine"
+    pullPolicy: IfNotPresent
+  port: 8080
+  resources:
+    requests: { cpu: 50m, memory: 32Mi }
+    limits: { memory: 64Mi }
+
+api:
+  replicas: 2                 # utilisé seulement si le HPA est désactivé
+  image:
+    repository: ghcr.io/brisil/inventaire-api
+    tag: "dev"
+    pullPolicy: IfNotPresent
+  port: 3000
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 60
+  pdb:
+    minAvailable: 1
+
+postgres:
+  image:
+    repository: postgres
+    tag: "16"
+    pullPolicy: IfNotPresent
+  port: 5432
+  database: inventaire
+  user: inventaire
+  storage: 1Gi
+  # le mot de passe ne va PAS dans ce fichier : Secret créé avec kubectl
+  existingSecret: postgres-secret
+  secretKey: password
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { memory: 512Mi }
+
+ingress:
+  enabled: true
+  className: nginx
+  host: inventaire.local
+  clusterIssuer: selfsigned
+  tlsSecretName: inventaire-tls
+
+networkPolicies:
+  enabled: true
+  ingressControllerNamespace: ingress-nginx
+  monitoringNamespace: monitoring
+
+rbac:
+  lecteur:
+    enabled: true
+
+monitoring:
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: monitoring     # doit correspondre au selector de ton Prometheus
+  prometheusRule:
+    enabled: true
+    errorRateThreshold: 0.05

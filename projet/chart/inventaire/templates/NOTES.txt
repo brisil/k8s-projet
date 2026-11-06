@@ -1,0 +1,8 @@
+Inventaire est déployé dans le namespace {{ .Release.Namespace }}.
+{{- if .Values.ingress.enabled }}
+
+Application : https://{{ .Values.ingress.host }}
+{{- end }}
+
+Vérifier l'état :
+  kubectl get all,pvc,ingress,hpa,networkpolicy -n {{ .Release.Namespace }}
