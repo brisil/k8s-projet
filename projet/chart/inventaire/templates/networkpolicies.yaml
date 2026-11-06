@@ -1,0 +1,135 @@
+{{- if .Values.networkPolicies.enabled }}
+{{- $full := include "inventaire.fullname" . }}
+{{- $api := dict "ctx" . "component" "api" }}
+{{- $front := dict "ctx" . "component" "frontend" }}
+{{- $pg := dict "ctx" . "component" "postgres" }}
+{{- $np := dict "ctx" . "component" "network" }}
+# 1. Tout est interdit, en entrée comme en sortie
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $full }}-default-deny-all
+  labels:
+    {{- include "inventaire.labels" $np | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+# 2. DNS autorisé pour tous les Pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $full }}-allow-dns
+  labels:
+    {{- include "inventaire.labels" $np | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# 3. Frontend : accepte uniquement l'Ingress Controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $full }}-frontend-ingress
+  labels:
+    {{- include "inventaire.labels" $np | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inventaire.selectorLabels" $front | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicies.ingressControllerNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.frontend.port }}
+---
+# 4. API : accepte l'Ingress Controller et Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $full }}-api-ingress
+  labels:
+    {{- include "inventaire.labels" $np | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inventaire.selectorLabels" $api | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicies.ingressControllerNamespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicies.monitoringNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.api.port }}
+---
+# 5. API : peut sortir uniquement vers PostgreSQL
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $full }}-api-egress
+  labels:
+    {{- include "inventaire.labels" $np | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inventaire.selectorLabels" $api | nindent 6 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "inventaire.selectorLabels" $pg | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.postgres.port }}
+---
+# 6. PostgreSQL : accepte uniquement l'API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $full }}-postgres-ingress
+  labels:
+    {{- include "inventaire.labels" $np | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "inventaire.selectorLabels" $pg | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "inventaire.selectorLabels" $api | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.postgres.port }}
+{{- end }}
