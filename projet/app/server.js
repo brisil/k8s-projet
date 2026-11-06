@@ -108,7 +108,7 @@ async function initDb() {
 
 const port = Number(process.env.PORT || 3000);
 initDb().then(() => {
-  const server = app.listen(port, () => log('info', `API demarree sur le port ${port}`));
+  const server = app.listen(port, () => log('info', `API Inventaire demarree sur le port ${port}`));
   process.on('SIGTERM', () => {
     log('info', 'SIGTERM recu, arret propre');
     server.close(() => pool.end().then(() => process.exit(0)));
