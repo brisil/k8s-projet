@@ -1,0 +1,37 @@
+{{- if .Values.ingress.enabled }}
+{{- $c := dict "ctx" . "component" "ingress" }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "inventaire.fullname" . }}
+  labels:
+    {{- include "inventaire.labels" $c | nindent 4 }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer | quote }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tlsSecretName }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "inventaire.componentName" (dict "ctx" . "component" "api") }}
+                port:
+                  number: {{ .Values.api.port }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "inventaire.componentName" (dict "ctx" . "component" "frontend") }}
+                port:
+                  number: {{ .Values.frontend.port }}
+{{- end }}
