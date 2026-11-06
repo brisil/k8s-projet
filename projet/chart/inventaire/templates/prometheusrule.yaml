@@ -1,0 +1,40 @@
+{{- if .Values.monitoring.prometheusRule.enabled }}
+{{- $c := dict "ctx" . "component" "api" }}
+{{- $ns := .Release.Namespace }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "inventaire.componentName" $c }}
+  labels:
+    {{- include "inventaire.labels" $c | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: inventaire-api.rules
+      rules:
+        - alert: InventaireApiTauxErreursEleve
+          expr: |
+            sum(rate(http_request_duration_seconds_count{namespace="{{ $ns }}", status=~"5.."}[2m]))
+              /
+            sum(rate(http_request_duration_seconds_count{namespace="{{ $ns }}", route!~"/metrics|/api/health|/api/ready"}[2m]))
+              > {{ .Values.monitoring.prometheusRule.errorRateThreshold }}
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Taux d'erreurs 5xx de l'API Inventaire trop élevé"
+            description: {{ `"{{ $value | humanizePercentage }} des requêtes de l'API sont en erreur."` }}
+        - alert: InventaireApiLatenceElevee
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (rate(http_request_duration_seconds_bucket{namespace="{{ $ns }}", route!~"/metrics|/api/health|/api/ready"}[2m])))
+              > {{ .Values.monitoring.prometheusRule.latencyP95ThresholdSeconds }}
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Latence p95 de l'API Inventaire trop élevée"
+            description: {{ `"Latence p95 : {{ $value | humanizeDuration }}."` }}
+{{- end }}

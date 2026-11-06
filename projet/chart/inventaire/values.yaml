@@ -27,6 +27,7 @@ api:
     minReplicas: 2
     maxReplicas: 6
     targetCPUUtilizationPercentage: 60
+    scaleDownStabilizationSeconds: 60
   pdb:
     minAvailable: 1
 
@@ -66,8 +67,10 @@ rbac:
 monitoring:
   serviceMonitor:
     enabled: true
+    interval: 15s
     labels:
       release: monitoring     # doit correspondre au selector de ton Prometheus
   prometheusRule:
     enabled: true
-    errorRateThreshold: 0.05
+    errorRateThreshold: 0.05          # 5 % d'erreurs 5xx
+    latencyP95ThresholdSeconds: 1
